@@ -47,7 +47,10 @@ def obtener_bordes(lidar, voxel, radio_peque, radio_grande, dist_min, dist_max, 
     lidar.elegir_colores(colors)
     lidar.draw_pointcloud()
     #Coge los indices de bordes y choque y quita duplicados
-    indices_totales = np.vstack((bordes + puntos_choque))
+    if (not puntos_choque) and (not bordes):
+        indices_totales = []
+    else:
+        indices_totales = np.vstack((bordes + puntos_choque))
     puntos_bordes = data[indices_totales]
     todos_puntos = np.arange(len(data))
     indices_libres = np.setdiff1d(todos_puntos, indices_totales)
@@ -59,11 +62,11 @@ def obtener_bordes(lidar, voxel, radio_peque, radio_grande, dist_min, dist_max, 
 lidar = Ouster(simulation=None)
 
 # Cargar el archivo PCD
-lidar.from_file("lidar/simulated_pointcloud6.pcd")
+lidar.from_file("lidar/simulated_pointcloud4.pcd")
 
 #Se calcula los puntos donde hay bordes
-bordes_cerca, libres_cerca = obtener_bordes(lidar, voxel=0.1, radio_peque=0.15, radio_grande=0.35, dist_min=0, dist_max=5, umbral=0.045, margen=0.5)
-bordes_lejos, libres_lejos = obtener_bordes(lidar, voxel=0.25, radio_peque=0.4, radio_grande=1, dist_min=4.5, dist_max=8, umbral=0.15, margen=0.5)
+bordes_cerca, libres_cerca = obtener_bordes(lidar, voxel=0.12, radio_peque=0.25, radio_grande=0.45, dist_min=0, dist_max=5, umbral=0.05, margen=0.5)
+bordes_lejos, libres_lejos = obtener_bordes(lidar, voxel=0.25, radio_peque=0.4, radio_grande=1, dist_min=4.5, dist_max=10, umbral=0.15, margen=0.5)
 
 #Se cogen todos los puntos donde hay bordes
 bordes_totales = np.vstack((bordes_cerca, bordes_lejos))

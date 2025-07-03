@@ -159,11 +159,8 @@ def simulate():
     # # robot.wait(100)
     # # # get lidar data
     # for i in range(1):
-    #     data = lidar.get_laser_data()
-    #     lidar.save_pointcloud('lidar/simulated_pointcloud7.pcd')
-    #     lidar.down_sample()
-    #     lidar.estimate_normals()
-    #     lidar.draw_pointcloud()
+    # lidar.save_pointcloud('lidar/simulated_pointcloud6.pcd')
+    # lidar.draw_pointcloud()
     simulation.stop()
 
 
