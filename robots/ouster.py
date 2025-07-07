@@ -56,7 +56,7 @@ class Ouster():
                 o3d.geometry.KDTreeSearchParamHybrid(radius=radius,
                                                      max_nn=50))
 
-    def elegir_colores(self, colors):
+    def choose_colors(self, colors):
         self.pointcloud.colors = o3d.utility.Vector3dVector(colors)
 
 
