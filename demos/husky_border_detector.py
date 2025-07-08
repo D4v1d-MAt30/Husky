@@ -11,6 +11,7 @@ def difference_of_normals(small_radius, large_radius):
     # Compute the Difference of Normals (DoN)
     diff_norm = (normals_large - normals_small) / 2
     return diff_norm
+    
 def filter_edge_indices(don_abs, data, threshold, max_distance, min_distance):
     distances = np.linalg.norm(data, axis=1)
     mask = (don_abs > threshold) & (distances < max_distance) & (distances > min_distance)
