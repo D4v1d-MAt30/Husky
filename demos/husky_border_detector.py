@@ -1,4 +1,3 @@
-#Prueba usar pra leer las normales de los objetos y detectarlos sin simulacion
 import numpy as np
 from robots.ouster import Ouster
 
@@ -11,7 +10,7 @@ def difference_of_normals(small_radius, large_radius):
     # Compute the Difference of Normals (DoN)
     diff_norm = (normals_large - normals_small) / 2
     return diff_norm
-    
+
 def filter_edge_indices(don_abs, data, threshold, max_distance, min_distance):
     distances = np.linalg.norm(data, axis=1)
     mask = (don_abs > threshold) & (distances < max_distance) & (distances > min_distance)
@@ -63,15 +62,22 @@ def get_edges(lidar, voxel, small_radius, large_radius, min_distance, max_distan
 lidar = Ouster(simulation=None)
 
 # Load the PCD file
-lidar.from_file("lidar/simulated_pointcloud3.pcd")
+lidar.from_file("lidar/simulated_pointcloud1.pcd")
 
 # Extract edge and free points
-near_edges, near_free = get_edges(lidar, voxel=0.12, small_radius=0.25, large_radius=0.45, min_distance=0, max_distance=5, threshold=0.05, margin=0.5)
-far_edges, far_free = get_edges(lidar, voxel=0.25, small_radius=0.4, large_radius=1, min_distance=4.5, max_distance=10, threshold=0.15, margin=0.5)
+near_edges, near_free = get_edges(lidar, voxel=0.1, small_radius=0.2, large_radius=0.3, min_distance=0, max_distance=5, threshold=0.05, margin=0.5)
+far_edges, far_free = get_edges(lidar, voxel=0.25, small_radius=0.4, large_radius=1, min_distance=5, max_distance=10, threshold=0.15, margin=0.5)
 
 # Combine all edge and free points
 all_edges = np.concatenate((near_edges, far_edges), axis=0)
 all_free = np.concatenate((near_free, far_free), axis=0)
-
+#
+all = np.concatenate((all_edges, all_free), axis=0)
+colors_edges = np.tile([1.0, 0.0, 0.0], (all_edges.shape[0], 1))
+colors_free = np.tile([0.5, 0.5, 0.5], (all_free.shape[0], 1))
+lidar.from_points(all)
+colors = np.concatenate((colors_edges, colors_free), axis=0)
+lidar.choose_colors(colors)
+lidar.draw_pointcloud()
 #Guardar la nube de puntos marcando los bordes
 #lidar.save_pointcloud('lidar/simulated_pointcloud7.pcd')

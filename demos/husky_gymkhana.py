@@ -99,9 +99,9 @@ def straight_movement(robot_center, robot, simulation, final_position, movement_
         #yaw, pitch, roll = angles
         #print("Euler angles:", angles)
         distance_error = distance_difference(robot_center, final_position[movement_axis], movement_axis)
-        v = np.clip(abs(distance_error) / 3, 0.5, 1.5)
+        v = np.clip(abs(distance_error) / 3, 0.05, 1.5)
         w = rotation_correction(robot_center, current_angle, lateral_axis, final_position[lateral_axis], target_angle, direction)
-        threshold = 0.25
+        threshold = 0.025
         if initial_position >= final_position[movement_axis]:
             if distance_error >= -threshold:
                 robot.move(v=0, w=0)
@@ -163,38 +163,38 @@ def simulate():
 
     # MOVEMENTSDA
     print('MOVING ROBOT')
-    straight_movement(robot_center, robot, simulation, final_position = (0, -8.5), movement_axis = 1)
-    turning_movement(robot_center, robot, simulation, turn_angle = 90)
-    straight_movement(robot_center, robot, simulation, final_position = (19.5, -9), movement_axis = 0)#Punto1
-    turning_movement(robot_center, robot, simulation, turn_angle = 90)
-    straight_movement(robot_center, robot, simulation, final_position = (20, 10), movement_axis = 1)
-    turning_movement(robot_center, robot, simulation, turn_angle = 90)
-    straight_movement(robot_center, robot, simulation, final_position = (15.5, 10.5), movement_axis = 0)
-    turning_movement(robot_center, robot, simulation, turn_angle=-90)
-    straight_movement(robot_center, robot, simulation, final_position = (15, 21), movement_axis = 1)
-    turning_movement(robot_center, robot, simulation, turn_angle=-90)
-    straight_movement(robot_center, robot, simulation, final_position = (16, 21.5), movement_axis = 0)#Punto2
-    straight_movement(robot_center, robot, simulation, final_position = (15.5, 21.5), movement_axis = 0, direction='backward')
-    turning_movement(robot_center, robot, simulation, turn_angle=90, direction='backward')
-    straight_movement(robot_center, robot, simulation, final_position = (15, 22), movement_axis = 1)
-    turning_movement(robot_center, robot, simulation, turn_angle=90)
-    straight_movement(robot_center, robot, simulation, final_position = (-8, 22.5), movement_axis = 0)
-    turning_movement(robot_center, robot, simulation, turn_angle=90)
-    turning_movement(robot_center, robot, simulation, turn_angle=-90)
-    straight_movement(robot_center, robot, simulation, final_position = (-17.5, 21.5), movement_axis = 0)
-    turning_movement(robot_center, robot, simulation, turn_angle=90)
-    straight_movement(robot_center, robot, simulation, final_position = (-18, 19), movement_axis = 1)#Punto3
-    turning_movement(robot_center, robot, simulation, turn_angle=90)
-    straight_movement(robot_center, robot, simulation, final_position = (-12, 18.5), movement_axis = 0)
-    turning_movement(robot_center, robot, simulation, turn_angle=-90)
-    straight_movement(robot_center, robot, simulation, final_position = (-11.5, -9.5), movement_axis = 1)
-    turning_movement(robot_center, robot, simulation, turn_angle=-90)
-    straight_movement(robot_center, robot, simulation, final_position = (-13.5, -10), movement_axis = 0)#Punto4
-    straight_movement(robot_center, robot, simulation, final_position = (-12, -10), movement_axis = 0, direction='backward')
-    turning_movement(robot_center, robot, simulation, turn_angle=-90, direction='backward')
-    straight_movement(robot_center, robot, simulation, final_position = (-11.5, 0), movement_axis = 1)
-    turning_movement(robot_center, robot, simulation, turn_angle=-90)
-    straight_movement(robot_center, robot, simulation, final_position = (0, 0.5), movement_axis = 0)#Punto final
+    # straight_movement(robot_center, robot, simulation, final_position = (0, -8.5), movement_axis = 1)
+    # turning_movement(robot_center, robot, simulation, turn_angle = 90)
+    # straight_movement(robot_center, robot, simulation, final_position = (19.5, -9), movement_axis = 0)#Punto1
+    # turning_movement(robot_center, robot, simulation, turn_angle = 90)
+    # straight_movement(robot_center, robot, simulation, final_position = (20, 10), movement_axis = 1)
+    # turning_movement(robot_center, robot, simulation, turn_angle = 90)
+    # straight_movement(robot_center, robot, simulation, final_position = (15.5, 10.5), movement_axis = 0)
+    # turning_movement(robot_center, robot, simulation, turn_angle=-90)
+    # straight_movement(robot_center, robot, simulation, final_position = (15, 21), movement_axis = 1)
+    # turning_movement(robot_center, robot, simulation, turn_angle=-90)
+    # straight_movement(robot_center, robot, simulation, final_position = (16, 21.5), movement_axis = 0)#Punto2
+    # straight_movement(robot_center, robot, simulation, final_position = (15.5, 21.5), movement_axis = 0, direction='backward')
+    # turning_movement(robot_center, robot, simulation, turn_angle=90, direction='backward')
+    # straight_movement(robot_center, robot, simulation, final_position = (15, 22), movement_axis = 1)
+    # turning_movement(robot_center, robot, simulation, turn_angle=90)
+    # straight_movement(robot_center, robot, simulation, final_position = (-8, 22.5), movement_axis = 0)
+    # turning_movement(robot_center, robot, simulation, turn_angle=90)
+    # turning_movement(robot_center, robot, simulation, turn_angle=-90)
+    # straight_movement(robot_center, robot, simulation, final_position = (-17.5, 21.5), movement_axis = 0)
+    # turning_movement(robot_center, robot, simulation, turn_angle=90)
+    # straight_movement(robot_center, robot, simulation, final_position = (-18, 19), movement_axis = 1)#Punto3
+    # turning_movement(robot_center, robot, simulation, turn_angle=90)
+    # straight_movement(robot_center, robot, simulation, final_position = (-12, 18.5), movement_axis = 0)
+    # turning_movement(robot_center, robot, simulation, turn_angle=-90)
+    # straight_movement(robot_center, robot, simulation, final_position = (-11.5, -9.5), movement_axis = 1)
+    # turning_movement(robot_center, robot, simulation, turn_angle=-90)
+    # straight_movement(robot_center, robot, simulation, final_position = (-13.5, -10), movement_axis = 0)#Punto4
+    # straight_movement(robot_center, robot, simulation, final_position = (-12, -10), movement_axis = 0, direction='backward')
+    # turning_movement(robot_center, robot, simulation, turn_angle=-90, direction='backward')
+    # straight_movement(robot_center, robot, simulation, final_position = (-11.5, 0), movement_axis = 1)
+    # turning_movement(robot_center, robot, simulation, turn_angle=-90)
+    # straight_movement(robot_center, robot, simulation, final_position = (0, 0.5), movement_axis = 0)#Punto final
 
     #  TORQUES
     # now, obtain the mean torques or torques for each wheel
@@ -216,7 +216,7 @@ def simulate():
     # # # get lidar data
     # for i in range(1):
     # lidar.get_laser_data()
-    # lidar.save_pointcloud('lidar/simulated_pointcloud6.pcd')
+    # lidar.save_pointcloud('lidar/simulated_pointcloud4.pcd')
     # lidar.draw_pointcloud()
     simulation.stop()
 
