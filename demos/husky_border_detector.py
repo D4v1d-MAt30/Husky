@@ -20,12 +20,12 @@ def filter_edge_indices(don_abs, data, threshold, max_distance, min_distance):
 def filter_collision_indices(min_distance, margin, data):
     if min_distance > 2:
         return np.array([], dtype=int)
-    size_x, size_y, size_z = 0.7, 1, 1.25
-    wheel_radius = 0.35463
+    size_x, size_y, size_z = 0.67, 0.99, 1.25
+    clearance = 0.13
     x, y, z = np.abs(data[:, 0]), np.abs(data[:, 1]), data[:, 2]
     lidar_height = 1.1325
     mask = ((x - margin < size_x / 2) & (y - margin < size_y / 2) &
-            (wheel_radius < (lidar_height + z)) & ((lidar_height + z) < size_z))
+            (clearance < (lidar_height + z)) & ((lidar_height + z) < size_z))
     collision_indices = np.where(mask)[0]
     return collision_indices
 
@@ -71,7 +71,7 @@ far_edges, far_free = get_edges(lidar, voxel=0.25, small_radius=0.4, large_radiu
 # Combine all edge and free points
 all_edges = np.concatenate((near_edges, far_edges), axis=0)
 all_free = np.concatenate((near_free, far_free), axis=0)
-#
+
 all = np.concatenate((all_edges, all_free), axis=0)
 colors_edges = np.tile([1.0, 0.0, 0.0], (all_edges.shape[0], 1))
 colors_free = np.tile([0.5, 0.5, 0.5], (all_free.shape[0], 1))
