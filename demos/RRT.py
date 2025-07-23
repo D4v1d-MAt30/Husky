@@ -1,5 +1,7 @@
 import numpy as np
 import random
+from scipy.spatial import KDTree
+import matplotlib.pyplot as plt
 
 class Node:
     def __init__(self, x, y, parent_index):
@@ -7,75 +9,53 @@ class Node:
         self.y = y
         self.parent_index = parent_index
 
+#Generates a random configuration point within given x and y limits.
 def rand_conf(x_size, y_size):
-        min_x, max_x = x_size
-        min_y, max_y = y_size
-        qrand = np.array([round(random.uniform(min_x, max_x), 3), round(random.uniform(min_y, max_y), 3)])
-        return qrand
+        q_rand = np.array([round(random.uniform(*x_size), 3), round(random.uniform(*y_size), 3)], dtype=np.float32)
+        return q_rand
 
-def nearest_vertex(node_list, qrand):
-    shortest_distance = float('inf')
-    qnear = ()
-    qnear_index = None
-    for i, node in enumerate(node_list):
-        distance = np.linalg.norm(np.array(qrand) - np.array([node.x, node.y]))
-        if distance < shortest_distance:
-            shortest_distance = distance
-            qnear = node
-            qnear_index = i
-    return qnear, qnear_index
+#Finds the nearest node in the tree to the random point qrand. Uses KDTree for efficient nearest neighbor search if needed
+def nearest_vertex(node_list, q_rand, kd_tree):
+    if kd_tree is None:
+        points = np.array([[n.x, n.y] for n in node_list], dtype=np.float32)
+        distances = np.linalg.norm(points - q_rand, axis=1)
+        index = np.argmin(distances)
+        return node_list[index], index
+    else:
+        _, index = kd_tree.query(q_rand)
+        return node_list[index], index
 
-def new_conf(qnear, qrand, incremental_distance, free_points):
-    qnear_pos = np.array([qnear.x, qnear.y])
-    direction = qrand - qnear_pos
+#Generates a new node configuration by moving from q_near to q_rand by a step_size.
+# Then the new configuration is the nearest free point.
+def new_conf(q_near, q_rand, incremental_distance, free_points_kdtree, free_points):
+    q_near_pos = np.array([q_near.x, q_near.y], dtype=np.float32)
+    direction = q_rand - q_near_pos
     direction_unitary = direction/np.linalg.norm(direction)
-    qnew = qnear_pos + direction_unitary * incremental_distance
-    shortest_distance = float('inf')
-    qnew_aprox = ()
-    for points in free_points:
-        distance = np.linalg.norm(qnew - points)
-        if distance < shortest_distance:
-            shortest_distance = distance
-            qnew_aprox = points
-    return qnew_aprox
+    q_new = q_near_pos + direction_unitary * incremental_distance
+    _, index = free_points_kdtree.query(q_new)
+    return free_points[index]
 
-def check_collision(qnew, qold, obstacles_points, threshold):
-    x2, y2 = qnew[0], qnew[1]
-    x1, y1 = qold.x, qold.y
-    x = np.linspace(x1, x2, 100)
-    y = np.linspace(y1, y2, 100)
-    path_points = np.column_stack((x, y))
-    diff = path_points[:, np.newaxis, :] - obstacles_points[np.newaxis, :, :]
-    distances = np.linalg.norm(diff, axis=2)
+#Checks if the path between q_old and q_new collides with any obstacles, or they are very close to obstacles.
+def check_collision(q_new, q_old, obstacle_points, threshold, use_kdtree):
+    x = np.linspace(q_old.x, q_new[0], 10)
+    y = np.linspace(q_old.y, q_new[1], 10)
+    path_points = np.column_stack((x, y)).astype(np.float32)
+
+    if use_kdtree:
+        distances,_ = obstacle_points.query(path_points, distance_upper_bound=threshold)
+    else:
+        diff = path_points[:, np.newaxis, :] - obstacle_points[np.newaxis, :, :]
+        distances = np.linalg.norm(diff, axis=2)
+
     if np.any(distances < threshold):
         return True
     else :
         return False
 
-def RRT(start_point, finish_point, incremental_distance, K, free_points, obstacles_points, threshold):
-    x_size = (np.min(free_points[:, 0]), np.max(free_points[:, 0]))
-    y_size = (np.min(free_points[:, 1]), np.max(free_points[:, 1]))
-    node_list = []
-    node_list.append(Node(start_point[0], start_point[1], None))
-    for i in range (K):
-        qrand = rand_conf(x_size, y_size)
-        qnear, qnear_index = nearest_vertex(node_list, qrand)
-        qnew = new_conf(qnear, qrand, incremental_distance, free_points)
-        collision = check_collision(qnew, qnear, obstacles_points, threshold)
-        if collision == False:
-            new_node = Node(qnew[0], qnew[1], qnear_index)
-            node_list.append(new_node)
-        #     print(f"Iter {i}: Added node at {qnew}, parent=({qnear.x}, {qnear.y})")
-        # else:
-        #     print("Node wasn't added due to a collision")
-        if np.linalg.norm(qnew - np.array(finish_point)) < 1:
-            path_nodes = path(node_list)
-            return node_list, path_nodes
-
+#Reconstructs the path from the last node back to the start node.
 def path(node_list):
     nodes_path = []
-    number_node = len(node_list) - 1
-    current_node = node_list[number_node]
+    current_node = node_list[-1]
     while current_node is not None:
         nodes_path.append(current_node)
         if current_node.parent_index is None:
@@ -83,47 +63,98 @@ def path(node_list):
         current_node = node_list[current_node.parent_index]
     return nodes_path[::-1]
 
-import matplotlib.pyplot as plt
-def draw_rrt(node_list, start_point, finish_point, path_nodes, obstacles_points):
+#Builds the RRT tree and searches for a path from start to goal.
+def rrt(start_point, goal_point, incremental_distance, max_iterations, free_points, obstacle_points, threshold):
+    x_size = (np.min(free_points[:, 0]), np.max(free_points[:, 0]))
+    y_size = (np.min(free_points[:, 1]), np.max(free_points[:, 1]))
+
+    free_points_kdtree = KDTree(free_points)
+    #We only use kdtree when there are more than 50 obstacles
+    num_obstacles = len(obstacle_points)
+    use_kdtree = num_obstacles > 50
+
+    obstacles_kdtree = None
+    if use_kdtree:
+        obstacles_kdtree = KDTree(obstacle_points)
+
+    node_list = [Node(start_point[0], start_point[1], None)]
+
+    for i in range (max_iterations):
+        q_rand = rand_conf(x_size, y_size)
+
+        # We only use kdtree when there are more than 200 nodes
+        if len(node_list) > 200:
+            points = np.array([[node.x, node.y] for node in node_list], dtype=np.float32)
+            kd_tree = KDTree(points)
+        else:
+            kd_tree = None
+
+        q_near, q_near_index = nearest_vertex(node_list, q_rand, kd_tree)
+        q_new = new_conf(q_near, q_rand, incremental_distance, free_points_kdtree, free_points)
+
+        if num_obstacles == 0:
+            collision = False
+        else:
+            if use_kdtree:
+                collision = check_collision(q_new, q_near, obstacles_kdtree, threshold, use_kdtree)
+            else:
+                collision = check_collision(q_new, q_near, obstacle_points, threshold, use_kdtree)
+
+        if not collision:
+            new_node = Node(q_new[0], q_new[1], q_near_index)
+            node_list.append(new_node)
+
+            # Check if goal is reached
+            if np.linalg.norm(q_new - np.array(goal_point)) < 1:
+                path_nodes = path(node_list)
+                return node_list, path_nodes
+
+    return node_list, []
+
+#Visualizes the RRT tree, obstacles, start/goal points, and the found path.
+def draw_rrt(node_list, start_point, goal_point, path_nodes, obstacle_points):
     plt.figure(figsize=(10, 10))
     plt.title("RRT Path")
     plt.xlabel("X")
     plt.ylabel("Y")
 
-    # Draw tree conections
+    # Draw tree edges and nodes
     for node in node_list:
         if node.parent_index is not None:
             parent = node_list[node.parent_index]
             plt.plot([node.x, parent.x], [node.y, parent.y], 'g-', linewidth=0.5)
-
-    # Draw nodes
-    for node in node_list:
-        plt.plot(node.x, node.y, 'go', markersize=2)
+            plt.plot(node.x, node.y, 'go', markersize=2)
 
     # Draw obstacles
-    if obstacles_points.size > 0:
-        obs_x = [p[0] for p in obstacles_points]
-        obs_y = [p[1] for p in obstacles_points]
-        plt.plot(obs_x, obs_y, 'ks', markersize=4, label='Obstáculos')
+    if obstacle_points.size > 0:
+        obs_x, obs_y = obstacle_points[:, 0], obstacle_points[:, 1]
+        plt.plot(obs_x, obs_y, 'ks', markersize=4, label='Obstacles')
 
-    # Draw start point and finish point
-    plt.plot(start_point[0], start_point[1], 'bo', markersize=8, label='Inicio')
-    plt.plot(finish_point[0], finish_point[1], 'ro', markersize=8, label='Fin')
+    # Draw start and goal points
+    plt.plot(start_point[0], start_point[1], 'bo', markersize=8, label='Start')
+    plt.plot(goal_point[0], goal_point[1], 'ro', markersize=8, label='Goal')
 
-    # Draw path
+    # Draw the found path
     path_x = [node.x for node in path_nodes]
     path_y = [node.y for node in path_nodes]
-    plt.plot(path_x, path_y, 'r-', linewidth=2, label='Ruta encontrada')
+    plt.plot(path_x, path_y, 'r-', linewidth=2, label='Found Path')
 
-    plt.legend()
+    plt.legend(loc = 'upper right')
     plt.grid(True)
     plt.axis('equal')
     plt.show()
 
-def RRT_algorithm(start_point, finish_point, incremental_distance, K, free_points, obstacles_points, threshold):
-    node_list, path_nodes = RRT(start_point, finish_point, incremental_distance, K, free_points, obstacles_points, threshold)
-    for i in range(len(path_nodes)):
-        print('Número iteración', i)
-        print('Valor x:', path_nodes[i].x, 'Valor y:', path_nodes[i].y)
-    draw_rrt(node_list, start_point, finish_point, path_nodes, obstacles_points)
+import time
+# Run the RRT algorithm and print the path nodes found. Then visualize the tree and path.
+def rrt_algorithm(start_point, goal_point, incremental_distance, max_iterations, free_points, obstacle_points, threshold):
+    start_time = time.time()
+    node_list, path_nodes = rrt(start_point, goal_point, incremental_distance, max_iterations, free_points, obstacle_points, threshold)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Tiempo total de ejecución del RRT: {elapsed_time:.4f} segundos")
+    if path_nodes == []:
+        print("Couldn't find path")
+    for i, node in enumerate(path_nodes):
+        print(f"Iteration {i}: x = {node.x}, y = {node.y}")
+    draw_rrt(node_list, start_point, goal_point, path_nodes, obstacle_points)
     return path_nodes

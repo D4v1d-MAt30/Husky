@@ -31,7 +31,7 @@ def simulate():
     accel = Accelerometer(simulation=simulation)
     accel.start(name='/Accelerometer')
 
-    # MOVEMENTSDA
+    # MOVEMENTS
     print('MOVING ROBOT')
     movements = [
         {"final_position": (0, -8.5), "movement_axis": 1},
@@ -73,7 +73,7 @@ def simulate():
 
     #  TORQUES
     # now, obtain the mean torques or torques for each wheel
-    # during 50 simulat steps.
+    # during 50 simulation steps.
     # for i in range(2):
     #     tau = robot.get_mean_wheel_torques()
     #     axyz = accel.get_accel_data()

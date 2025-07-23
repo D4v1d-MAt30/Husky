@@ -72,12 +72,12 @@ far_edges, far_free = get_edges(lidar, voxel=0.25, small_radius=0.4, large_radiu
 all_edges = np.concatenate((near_edges, far_edges), axis=0)
 all_free = np.concatenate((near_free, far_free), axis=0)
 
-all = np.concatenate((all_edges, all_free), axis=0)
+all_points = np.concatenate((all_edges, all_free), axis=0)
 colors_edges = np.tile([1.0, 0.0, 0.0], (all_edges.shape[0], 1))
 colors_free = np.tile([0.5, 0.5, 0.5], (all_free.shape[0], 1))
-lidar.from_points(all)
+lidar.from_points(all_points)
 colors = np.concatenate((colors_edges, colors_free), axis=0)
 lidar.choose_colors(colors)
 lidar.draw_pointcloud()
-#Guardar la nube de puntos marcando los bordes
+#Save point cloud with the edges in red
 #lidar.save_pointcloud('lidar/simulated_pointcloud7.pcd')
