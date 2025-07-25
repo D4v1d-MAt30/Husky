@@ -31,8 +31,8 @@ def new_conf(q_near, q_rand, incremental_distance, free_points_kdtree, free_poin
     q_near_pos = np.array([q_near.x, q_near.y], dtype=np.float32)
     direction = q_rand - q_near_pos
     #If q_rand is the same point as q_near it returns q_near as q_new
-    if q_rand == q_near:
-        return np.array([q_near.x, q_near.y])
+    if np.array_equal(q_rand, q_near_pos):
+        return q_near_pos
     direction_unitary = direction/np.linalg.norm(direction)
     q_new = q_near_pos + direction_unitary * incremental_distance
     _, index = free_points_kdtree.query(q_new)

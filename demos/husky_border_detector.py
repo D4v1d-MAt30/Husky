@@ -1,4 +1,5 @@
 import numpy as np
+from RRT import rrt_algorithm
 from robots.ouster import Ouster
 
 def difference_of_normals(small_radius, large_radius):
@@ -47,7 +48,7 @@ def get_edges(lidar, voxel, small_radius, large_radius, min_distance, max_distan
     colors[edge_indices] = [1.0, 0.0, 0.0]         # rojo
     colors[collision_indices] = [0.0, 1.0, 0.0]  # verde
     lidar.choose_colors(colors)
-    lidar.draw_pointcloud()
+    # lidar.draw_pointcloud()
 
     # Combine edge and collision indices without removing duplicates
     total_indices = np.concatenate((edge_indices, collision_indices))
@@ -62,10 +63,10 @@ def get_edges(lidar, voxel, small_radius, large_radius, min_distance, max_distan
 lidar = Ouster(simulation=None)
 
 # Load the PCD file
-lidar.from_file("lidar/simulated_pointcloud1.pcd")
+lidar.from_file("lidar/simulated_pointcloud12.pcd")
 
 # Extract edge and free points
-near_edges, near_free = get_edges(lidar, voxel=0.1, small_radius=0.2, large_radius=0.3, min_distance=0, max_distance=5, threshold=0.05, margin=0.5)
+near_edges, near_free = get_edges(lidar, voxel=0.12, small_radius=0.2, large_radius=0.3, min_distance=0, max_distance=5, threshold=0.05, margin=0.5)
 far_edges, far_free = get_edges(lidar, voxel=0.25, small_radius=0.4, large_radius=1, min_distance=5, max_distance=10, threshold=0.15, margin=0.5)
 
 # Combine all edge and free points
@@ -79,5 +80,9 @@ lidar.from_points(all_points)
 colors = np.concatenate((colors_edges, colors_free), axis=0)
 lidar.choose_colors(colors)
 lidar.draw_pointcloud()
+start_point = np.array([3, -3])
+finish_point = np.array([3, 3])
+path = rrt_algorithm(start_point=start_point, goal_point=finish_point, threshold=0.5, goal_threshold=0.25,
+                     incremental_distance=0.5, max_iterations=10000, free_points=all_free[:, :2], obstacle_points=all_edges[:, :2])
 #Save point cloud with the edges in red
 #lidar.save_pointcloud('lidar/simulated_pointcloud7.pcd')

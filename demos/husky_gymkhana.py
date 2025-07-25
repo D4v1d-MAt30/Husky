@@ -91,7 +91,7 @@ def simulate():
     # # # get lidar data
     # for i in range(1):
     # lidar.get_laser_data()
-    # lidar.save_pointcloud('lidar/simulated_pointcloud4.pcd')
+    # lidar.save_pointcloud('lidar/simulated_pointcloud1.pcd')
     # lidar.draw_pointcloud()
     simulation.stop()
 

@@ -46,4 +46,5 @@ print("Start:", start_point, "Goal:", goal_point)
 max_iterations = 10000
 incremental_distance = 2
 
-path_nodes = rrt_algorithm(start_point, goal_point, incremental_distance, max_iterations, free_points, obstacle_points, threshold=1)
+path_nodes = rrt_algorithm(start_point, goal_point, incremental_distance, max_iterations,
+                           free_points, obstacle_points, threshold=1, goal_threshold=0.25)
