@@ -10,16 +10,18 @@ class Node:
         self.parent_index = parent_index
 
 #Generates a random configuration point within given x and y limits.
-def rand_conf(x_size, y_size):
-        q_rand = np.array([round(random.uniform(*x_size), 3), round(random.uniform(*y_size), 3)], dtype=np.float32)
+def rand_conf(x_size, y_size, near_rand, goal):
+        if near_rand:
+            q_rand = np.array([random.uniform(goal[0] - 0.5, goal[0] + 0.5), random.uniform(goal[1] - 0.5, goal[1] + 0.5)], dtype=np.float32)
+        else:
+            q_rand = np.array([random.uniform(*x_size), random.uniform(*y_size)], dtype=np.float32)
         return q_rand
 
 #Finds the nearest node in the tree to the random point qrand. Uses KDTree for efficient nearest neighbor search if needed
 def nearest_vertex(node_list, q_rand, kd_tree):
     if kd_tree is None:
         points = np.array([[n.x, n.y] for n in node_list], dtype=np.float32)
-        distances = np.linalg.norm(points - q_rand, axis=1)
-        index = np.argmin(distances)
+        index = np.argmin(np.linalg.norm(points - q_rand, axis=1))
         return node_list[index], index
     else:
         _, index = kd_tree.query(q_rand)
@@ -28,37 +30,39 @@ def nearest_vertex(node_list, q_rand, kd_tree):
 #Generates a new node configuration by moving from q_near to q_rand by a step_size.
 # Then the new configuration is the nearest free point.
 def new_conf(q_near, q_rand, incremental_distance, free_points_kdtree, free_points):
-    q_near_pos = np.array([q_near.x, q_near.y], dtype=np.float32)
-    direction = q_rand - q_near_pos
-    #If q_rand is the same point as q_near it returns q_near as q_new
-    if np.array_equal(q_rand, q_near_pos):
-        return q_near_pos
+    direction = q_rand - q_near
+    #If q_rand is the same point as q_near it returns q_near as q_new to avoid division by zero
+    if np.linalg.norm(direction) < 1e-6:
+        return q_near
     direction_unitary = direction/np.linalg.norm(direction)
-    q_new = q_near_pos + direction_unitary * incremental_distance
+    q_new = q_near + direction_unitary * incremental_distance
     _, index = free_points_kdtree.query(q_new)
     return free_points[index]
 
+#Checks if the point is not near a free point
+def check_free_points(free_points_kdtree, point, threshold):
+    distance,_ = free_points_kdtree.query(point)
+    return np.all(distance <= threshold)
+
+#Checks if the point is near an obstacle
+def check_obstacle(obstacle_points, use_kdtree, point, threshold):
+    if use_kdtree:
+        distances,_ = obstacle_points.query(point, distance_upper_bound=threshold)
+    else:
+        diff = point[:, np.newaxis, :] - obstacle_points[np.newaxis, :, :]
+        distances = np.linalg.norm(diff, axis=2)
+    return np.any(distances < threshold)
+
 #Checks if the path between q_old and q_new collides with any obstacles, or they are very close to obstacles.
-def check_collision(q_new, q_old, obstacle_points, threshold, use_kdtree, goal_point, goal_threshold):
+def check_path(q_new, q_old, obstacle_points, threshold, use_kdtree, num_obstacles, free_points_kdtree, goal_threshold):
     x = np.linspace(q_old.x, q_new[0], 10)
     y = np.linspace(q_old.y, q_new[1], 10)
     path_points = np.column_stack((x, y)).astype(np.float32)
-
-    goal = np.array(goal_point, dtype=np.float32)
-    distances_to_goal = np.linalg.norm(path_points - goal, axis=1)
-    if np.any(distances_to_goal < goal_threshold):
-        return "goal"
-
-    if use_kdtree:
-        distances,_ = obstacle_points.query(path_points, distance_upper_bound=threshold)
-    else:
-        diff = path_points[:, np.newaxis, :] - obstacle_points[np.newaxis, :, :]
-        distances = np.linalg.norm(diff, axis=2)
-
-    if np.any(distances < threshold):
-        return True
-    else :
-        return False
+    if num_obstacles > 0:
+        obstacles = check_obstacle(obstacle_points, use_kdtree, path_points, threshold)
+        if obstacles:
+            return True
+    return not check_free_points(free_points_kdtree, path_points, goal_threshold)
 
 #Reconstructs the path from the last node back to the start node.
 def path(node_list):
@@ -75,20 +79,44 @@ def path(node_list):
 def rrt(start_point, goal_point, incremental_distance, max_iterations, free_points, obstacle_points, threshold, goal_threshold):
     x_size = (np.min(free_points[:, 0]), np.max(free_points[:, 0]))
     y_size = (np.min(free_points[:, 1]), np.max(free_points[:, 1]))
-
     free_points_kdtree = KDTree(free_points)
-    #We only use kdtree when there are more than 50 obstacles
+
+    # Checks if the goal is near a free point to know if it's reachable
+    if not check_free_points(free_points_kdtree, goal_point, goal_threshold):
+        return [], []
+
+    #We only use kdtree when there are more than 50 obstacles and see if the goal is very close to an object
     num_obstacles = len(obstacle_points)
     use_kdtree = num_obstacles > 50
-
     obstacles_kdtree = None
     if use_kdtree:
         obstacles_kdtree = KDTree(obstacle_points)
+        obstacle = check_obstacle(obstacles_kdtree, use_kdtree, goal_point, threshold)
+    else:
+        obstacle = check_obstacle(obstacle_points, use_kdtree, goal_point, threshold)
+    if obstacle:
+        return [], []
 
-    node_list = [Node(start_point[0], start_point[1], None)]
+    start_node = Node(start_point[0], start_point[1], None)
+    node_list = [start_node]
 
+    #First we check if the path could be a straight line
+    if num_obstacles == 0:
+        collision = False
+    else:
+        if use_kdtree:
+            collision = check_path(goal_point, start_node, obstacles_kdtree, threshold, use_kdtree, num_obstacles, free_points_kdtree, goal_threshold)
+        else:
+            collision = check_path(goal_point, start_node, obstacle_points, threshold, use_kdtree, num_obstacles, free_points_kdtree, goal_threshold)
+
+    if not collision:
+        goal_node = Node(goal_point[0], goal_point[1], 0)
+        node_list.append(goal_node)
+        return node_list, [start_node, goal_node]
+
+    near_rand = False
     for i in range (max_iterations):
-        q_rand = rand_conf(x_size, y_size)
+        q_rand = rand_conf(x_size, y_size, near_rand, goal_point)
 
         # We only use kdtree when there are more than 200 nodes
         if len(node_list) > 200:
@@ -98,30 +126,33 @@ def rrt(start_point, goal_point, incremental_distance, max_iterations, free_poin
             kd_tree = None
 
         q_near, q_near_index = nearest_vertex(node_list, q_rand, kd_tree)
-        q_new = new_conf(q_near, q_rand, incremental_distance, free_points_kdtree, free_points)
-
-        if num_obstacles == 0:
-            collision = False
-        else:
-            if use_kdtree:
-                collision = check_collision(q_new, q_near, obstacles_kdtree, threshold, use_kdtree, goal_point, goal_threshold)
-            else:
-                collision = check_collision(q_new, q_near, obstacle_points, threshold, use_kdtree, goal_point, goal_threshold)
-
-        if collision == "goal":
+        q_near_pos = np.array([q_near.x, q_near.y], dtype=np.float32)
+        # Checks if the near point is near the goal point
+        if np.linalg.norm(q_near_pos - goal_point) <= goal_threshold:
             new_node = Node(goal_point[0], goal_point[1], q_near_index)
             node_list.append(new_node)
             path_nodes = path(node_list)
             return node_list, path_nodes
 
-        if collision == False:
+        #Calculate q_new and if it's very close to q_near node isn't added
+        q_new = new_conf(q_near_pos, q_rand, incremental_distance, free_points_kdtree, free_points)
+        if np.linalg.norm(q_new - q_near_pos) < 1e-3:
+            continue
+
+        if num_obstacles == 0:
+            obstacles = False
+        else:
+            if use_kdtree:
+                obstacles = check_obstacle(obstacles_kdtree, use_kdtree, q_new, threshold)
+            else:
+                obstacles = check_obstacle(obstacle_points, use_kdtree, q_new, threshold)
+
+        if not obstacles:
             new_node = Node(q_new[0], q_new[1], q_near_index)
             node_list.append(new_node)
-
-            # Check if goal is reached
-            if np.linalg.norm(q_new - np.array(goal_point)) < goal_threshold:
-                path_nodes = path(node_list)
-                return node_list, path_nodes
+            #When a node is close to the goal activate near_rand to find only random points near goal
+            if np.linalg.norm(goal_point - q_new) < threshold:
+                near_rand = True
 
     return node_list, []
 
