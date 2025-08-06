@@ -71,8 +71,8 @@ class EdgeDetector:
 
         # # Colorize: gray for all, red for edges, green for collisions
         # colors = np.full((data.shape[0], 3), 0.5)
-        # colors[edge_indices] = [1.0, 0.0, 0.0]         # rojo
-        # colors[collision_indices] = [0.0, 1.0, 0.0]  # verde
+        # colors[edge_indices] = [1.0, 0.0, 0.0]         # red
+        # colors[collision_indices] = [0.0, 1.0, 0.0]  # green
         # lidar.choose_colors(colors)
         # lidar.draw_pointcloud()
 

@@ -25,7 +25,7 @@ def simulate():
     # Simulate a LiDAR
     lidar = Ouster(simulation=simulation)
     lidar.start(name='/OS1')
-    # A dummy object ath the robot center
+    # A dummy object at the robot center
     robot_center = CoppeliaObject(simulation=simulation)
     robot_center.start(name='/HuskyCenter')
     # an accelerometer
@@ -36,23 +36,23 @@ def simulate():
     print('MOVING ROBOT')
     movements = [
         {"final_position": (0, -8.5), "movement_axis": 1},
-        {"final_position": (19.5, -9), "movement_axis": 0},                             #Point 1
+        {"final_position": (19.5, -9), "movement_axis": 0},                                 # Point 1
         {"final_position": (20, 10), "movement_axis": 1},
         {"final_position": (15.5, 10.5), "movement_axis": 0},
         {"final_position": (15, 20), "movement_axis": 1},
-        {"final_position": (16.5, 20.5), "movement_axis": 0},                             #Point 2
+        {"final_position": (16.5, 20.5), "movement_axis": 0},                               # Point 2
         {"final_position": (17, 22.5), "movement_axis": 1},
         {"final_position": (-8, 23), "movement_axis": 0},
         {"final_position": (-8.5, 22), "movement_axis": 1},
         {"final_position": (-17.5, 21.5), "movement_axis": 0},
-        {"final_position": (-18, 19), "movement_axis": 1},                              #Point 3
+        {"final_position": (-18, 19), "movement_axis": 1},                                  # Point 3
         {"final_position": (-12, 18.5), "movement_axis": 0},
         {"final_position": (-11.5, 4.5), "movement_axis": 1},
         {"final_position": (-13, 4), "movement_axis": 0},
-        {"final_position": (-13.5, -9.5), "movement_axis": 1},                          #Point 4
+        {"final_position": (-13.5, -9.5), "movement_axis": 1},                              # Point 4
         {"final_position": (-12, -10), "movement_axis": 0},
         {"final_position": (-11.5, 0), "movement_axis": 1},
-        {"final_position": (0, 0.5), "movement_axis": 0},                               #Final point
+        {"final_position": (0, 0.5), "movement_axis": 0},                                   # Final point
     ]
 
     edges_before = np.empty((0, 2))
