@@ -6,13 +6,14 @@ Please open the scenes/more/husky_robot.ttt scene before running this script.
 @Authors: Víctor Márquez, Arturo Gil
 @Time: February 2024
 # """
+import numpy as np
 
 from robots.accelerometer import Accelerometer
 from robots.objects import CoppeliaObject
 from robots.ouster import Ouster
 from robots.simulation import Simulation
 from robots.husky import HuskyRobot
-from Movement import movement
+from Movement import PathPlanner
 
 def simulate():
     # Start simulation
@@ -31,7 +32,7 @@ def simulate():
     accel = Accelerometer(simulation=simulation)
     accel.start(name='/Accelerometer')
 
-    # MOVEMENTS
+    # # Define a sequence of movements for the robot to follow
     print('MOVING ROBOT')
     movements = [
         {"final_position": (0, -8.5), "movement_axis": 1},
@@ -54,13 +55,24 @@ def simulate():
         {"final_position": (0, 0.5), "movement_axis": 0},                               #Final point
     ]
 
+    edges_before = np.empty((0, 2))
+
     for i in range(len(movements)):
         current = movements[i]
+
+        # Set the previous movement parameters (or default if first movement)
         if i == 0:
             previous = {"final_position": (0, 0), "movement_axis": current["movement_axis"]}
         else:
             previous = movements[i - 1]
-        movement(
+
+        if i == len(movements) - 1:
+            last = True
+        else:
+            last = False
+
+        # Create a PathPlanner instance for the current movement segment
+        movement_planner = PathPlanner(
         robot_center,
         robot,
         simulation,
@@ -69,8 +81,13 @@ def simulate():
         movement_axis=current["movement_axis"],
         previous_axis=previous["movement_axis"],
         previous_position=previous["final_position"],
+        last= last,
         direction=current.get("direction", "forward")
     )
+
+        # Execute the movement and update edges_before accordingly
+        edges_before = movement_planner.move_to_target(edges_before)
+
     simulation.stop()
 
 

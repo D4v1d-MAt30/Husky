@@ -110,7 +110,7 @@ class Node:
 # and provides visualization of the final path and exploration tree.
 class RRT:
     def __init__(self, start_point, goal_point, free_points, obstacle_points, incremental_distance=0.2,
-                 max_iterations=10000, threshold=0.75, goal_threshold=0.2):
+                 max_iterations=3000, threshold=0.75, goal_threshold=0.2):
         # Initialize start and goal
         self.start = np.array(start_point, dtype=np.float32)
         self.goal = np.array(goal_point, dtype=np.float32)
@@ -130,17 +130,18 @@ class RRT:
         # Spatial index for fast nearest neighbor search
         self.free_points_kdtree = KDTree(self.free_points)
         self.num_objects = len(obstacle_points)
-        self.use_kdtree = self.num_objects > 50  # Use KDTree only if there are many obstacles
+        self.use_kdtree = self.num_objects > 50  # Use KDTree only if there are many obstacles for faster collision checking
 
         self.node_list: list[Node] = []  # Stores the nodes in the RRT tree
+        self.start_check_collision = False  # Flag to lower collision threshold during start position adjustment
 
     # Generate a random configuration in the space
     def rand_conf(self, near_rand):
         if near_rand:
             # Bias sampling near the goal
             return np.array([
-                np.random.uniform(self.goal[0] - 0.5, self.goal[0] + 0.5),
-                np.random.uniform(self.goal[1] - 0.5, self.goal[1] + 0.5)
+                np.random.uniform(self.goal[0] - self.goal_threshold, self.goal[0] + self.goal_threshold),
+                np.random.uniform(self.goal[1] - self.goal_threshold, self.goal[1] + self.goal_threshold)
             ], dtype=np.float32)
         else:
             # Uniform sampling within the space bounds
@@ -170,21 +171,25 @@ class RRT:
         distance, _ = self.free_points_kdtree.query(point)
         return np.all(distance <= self.goal_threshold)
 
-    # Check if the given point(s) are too close to obstacles
+    # Check if the given point or array of points is too close to any obstacles
     def check_obstacle(self, point, obstacles):
         if self.num_objects == 0:
             return False
+        if self.start_check_collision:
+            threshold = self.threshold/3    # Use a tighter threshold when adjusting start position
+        else:
+            threshold = self.threshold
         if self.use_kdtree:
-            distances, _ = obstacles.query(point, distance_upper_bound=self.threshold)
+            distances, _ = obstacles.query(point, distance_upper_bound=threshold)
         else:
             if point.shape == (2,):
                 distances = np.linalg.norm(self.obstacle_points - point, axis=1)
             else:
                 diff = point[:, np.newaxis, :] - self.obstacle_points[np.newaxis, :, :]
                 distances = np.linalg.norm(diff, axis=2)
-        return np.any(distances < self.threshold)
+        return np.any(distances < threshold)
 
-    # Check if the path between two nodes collides with obstacles
+    # Returns True if a collision is detected along the straight-line path between q_start and q_finish, otherwise False
     def check_path(self, q_finish, q_start, obstacles):
         if self.num_objects == 0:
             return False  # No obstacles to check
@@ -207,27 +212,62 @@ class RRT:
             current = self.node_list[current.parent_index]
         return np.array(nodes_path[::-1])
 
-    # Adjusts the goal if the original goal is not in free space
-    def new_goal(self, obstacles):
+    # Find candidates that are near a point and aren't close to an obstacle
+    def find_candidates(self, point, obstacles):
         # Find nearby free points within radius 2 of the original goal
-        close_indices = self.free_points_kdtree.query_ball_point(self.goal, r=2)
+        close_indices = self.free_points_kdtree.query_ball_point(point, r=2)
         if len(close_indices) == 0:
-            return None     # No nearby free points found
+            return None  # No nearby free points found
 
         candidates = self.free_points[close_indices]
 
         # Filter out candidates that are in collision with obstacles
         mask_valid = [not self.check_obstacle(p, obstacles) for p in candidates]
-        candidates = candidates[mask_valid]
+        return candidates[mask_valid]
 
-        if len(candidates) == 0:
+    # Adjusts the goal if the original goal is not in free space
+    def new_goal(self, obstacles):
+        candidates = self.find_candidates(self.goal, obstacles)
+
+        if candidates is None or len(candidates) == 0:
+            print("[New Goal] No nearby candidate points found.")
             return None     # No valid candidates
 
         # Return the candidate closest to the original goal
         closest_index = np.argmin(np.linalg.norm(candidates - self.goal, axis=1))
         return candidates[closest_index]
 
-    # Main RRT build process
+    # Adjusts the goal if the start position it is in collision.
+    # Returns a valid nearby point if a collision-free path can be established.
+    def start_collision(self, obstacles):
+        candidates = self.find_candidates(self.start, obstacles)
+
+        if candidates is None or len(candidates) == 0:
+            print("[Start Collision] No nearby candidate points found.")
+            return None  # No valid candidates found near the start
+
+        self.start_check_collision = True   # Lower collision threshold during checking
+
+        # Filter candidates where a collision-free path from the start exists
+        valid_candidates = []
+        for i in range(len(candidates)):
+            if not self.check_path(candidates[i], self.start, obstacles):
+                valid_candidates.append(candidates[i])
+
+        self.start_check_collision = False
+
+        if len(valid_candidates) == 0:
+            print("[Start Collision] All nearby candidates result in collision.")
+            return None  # No valid path to any candidate
+
+        valid_candidates = np.array(valid_candidates)
+
+        # Select candidate closest to the original goal
+        closest_index = np.argmin(np.linalg.norm(valid_candidates - self.goal, axis=1))
+        return valid_candidates[closest_index]
+
+    # Builds the RRT tree starting from the start position toward the goal.
+    # Returns the planned path (as a list of points) and a boolean indicating if start adjustment was used
     def build_rrt(self):
         # Create KDTree for obstacles if there are many
         obstacles_kdtree = None
@@ -236,13 +276,21 @@ class RRT:
 
         # Abort if goal is in collision
         if self.check_obstacle(self.goal, obstacles_kdtree):
-            return None
+            print('Goal is in collision')
+            return None, False
+
+        # Check if start is in collision or very close;
+        if self.check_obstacle(self.start, obstacles_kdtree):
+            new_goal = self.start_collision(obstacles_kdtree)
+            if new_goal is None:
+                return None, False   # No reachable replacement for the goal
+            return np.array([[self.start[0], self.start[1]],[new_goal[0], new_goal[1]]]), True
 
         # Check if goal is in free space; adjust if not
         if not self.check_free_points(self.goal):
             new_goal = self.new_goal(obstacles_kdtree)
             if new_goal is None:
-                return None   # No reachable replacement for the goal
+                return None, False   # No reachable replacement for the goal
             else:
                 self.goal = new_goal
 
@@ -250,13 +298,13 @@ class RRT:
         start_node = Node(self.start[0], self.start[1], None)
         self.node_list = [start_node]
 
-        # # Check if a direct path from start to goal is collision-free
+        # Check if a direct path from start to goal is collision-free
         collision = self.check_path(self.goal, self.start, obstacles_kdtree)
         if not collision:
             # Direct connection to goal is possible
             goal_node = Node(self.goal[0], self.goal[1], 0)
             self.node_list.append(goal_node)
-            return self.reconstruct_path()
+            return self.reconstruct_path(), False
 
         near_rand = False
         kd_tree = None
@@ -267,7 +315,7 @@ class RRT:
 
             # Use KDTree to speed up nearest neighbor search if many nodes exist
             if len(self.node_list) > 200:
-                if len(points) != len(self.node_list):  # Only rebuild if necessary
+                if len(points) != len(self.node_list):  # Rebuilding KDTree only when node_list changes
                     points = np.array([[n.x, n.y] for n in self.node_list])
                     kd_tree = KDTree(points)
             else:
@@ -281,7 +329,7 @@ class RRT:
             if np.linalg.norm(q_near_pos - self.goal) <= self.goal_threshold:
                 goal_node = Node(self.goal[0], self.goal[1], index)
                 self.node_list.append(goal_node)
-                return self.reconstruct_path()
+                return self.reconstruct_path(), False
 
             # Extend toward q_rand to create q_new
             q_new = self.new_conf(q_near_pos, q_rand)
@@ -300,7 +348,7 @@ class RRT:
             if np.linalg.norm(q_new - self.goal) < 1.5 * self.threshold:
                 near_rand = True
 
-        return None  # Path not found
+        return None, False  # Path not found
 
     # Visualize the RRT tree, obstacles, start and goal
     def draw(self, path_nodes):
@@ -336,11 +384,11 @@ class RRT:
 
     # Run the RRT algorithm and display result
     def run(self):
-        path_nodes = self.build_rrt()
+        path_nodes, start_collision = self.build_rrt()
         if path_nodes is None:
             print("Couldn't find path")
-        else:
-            for i, node in enumerate(path_nodes):
-                print(f"Iteration {i}: x = {node[0]:.3f}, y = {node[1]:.3f}")
+        # else:
+        #     for i, node in enumerate(path_nodes):
+        #         print(f"Iteration {i}: x = {node[0]:.3f}, y = {node[1]:.3f}")
         # self.draw(path_nodes)
-        return path_nodes
+        return path_nodes, start_collision
