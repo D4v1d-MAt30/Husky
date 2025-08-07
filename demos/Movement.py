@@ -169,6 +169,27 @@ class PathPlanner:
 
         return path_nodes, near_edges[:, :2] + current_point, start_collision
 
+    # Calculates angular velocity and adjusts linear speed based on angular error and movement direction.
+    def calculate_turning_velocity(self, angular_error, v):
+        abs_error = abs(angular_error)
+
+        if abs_error < 1:
+            w = 0
+        elif abs_error > 15:
+            if abs_error > 30:
+                w = np.clip(angular_error / 5, -1.5, 1.5)
+            else:
+                w = np.clip(angular_error / 5, -1, 1)
+            v = min(0.5, v)
+        else:
+            w = np.clip(angular_error / 10, -0.5, 0.5)
+
+        # Reverse direction if moving backwards
+        if self.direction == 'backward':
+            v = -v
+
+        return v, w
+
     # Calculates linear and angular velocity to follow a straight path.
     # Slows down near the end or during collisions/inclination.
     def straight_movement(self, path, points, start_collision):
@@ -183,19 +204,7 @@ class PathPlanner:
         if np.array_equal(target_point, points[-2]):
             v = 0.5
 
-        if abs(angular_error) < 1:
-            w = 0
-        elif abs(angular_error) > 15:
-            if abs(angular_error) > 30:
-                w = np.clip(angular_error / 5, -1.5, 1.5)
-            else:
-                w = np.clip(angular_error / 5, -1, 1)
-            v = min(0.5, v)
-        else:
-            w = np.clip(angular_error / 10, -0.5, 0.5)
-
-        if self.direction == 'backward':
-            v = -v
+        v, w = self.calculate_turning_velocity(angular_error, v)
 
         if self.get_inclination() or start_collision:
             v = 0.25
@@ -207,20 +216,10 @@ class PathPlanner:
         current_point = path[i]
         target_point = path[i+1]
         angular_error = self.compute_target_angle_error(current_point, target_point)
+
         v = 0.25
 
-        if abs(angular_error) < 1:
-            w = 0
-        elif abs(angular_error) > 15:
-            if abs(angular_error) > 30:
-                w = np.clip(angular_error / 5, -1.5, 1.5)
-            else:
-                w = np.clip(angular_error / 5, -1, 1)
-        else:
-            w = np.clip(angular_error / 10, -0.5, 0.5)
-
-        if self.direction == 'backward':
-            v = -v
+        v, w = self.calculate_turning_velocity(angular_error, v)
 
         return v, w
 
