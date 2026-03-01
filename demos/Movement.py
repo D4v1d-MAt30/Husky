@@ -30,8 +30,6 @@ class PathPlanner:
         self.direction = direction
         self.edges_before =  np.empty((0, 2))
         self.should_draw_path = last
-        self.error_recta_sum = 0.0
-        self.error_recta_count = 0
         self.real_trajectory = []
         self.planned_trajectories = []
 
@@ -227,27 +225,6 @@ class PathPlanner:
 
         return v, w
 
-    def point_to_path_distance(self, path):
-        """ Calcula la distancia mínima entre un punto real del robot y una trayectoria planificada (polilínea formada por los nodos del path). point : [x, y] posición real del robot path : Nx2 array de nodos devueltos por edge_rrt_planner """
-
-        point = np.array(self.get_current_point())
-        min_dist = np.inf
-        for i in range(len(path) - 1):
-            a = path[i]
-            b = path[i + 1]
-            ab = b - a
-            ap = point - a  # Proyección del punto sobre el segmento
-            if np.allclose(ab, 0):
-                dist = np.linalg.norm(ap)
-            else:
-                t = np.dot(ap, ab) / np.dot(ab, ab)
-                t = np.clip(t, 0.0, 1.0)
-                closest = a + t * ab
-                dist = np.linalg.norm(point - closest)
-            min_dist = min(min_dist, dist)
-        return min_dist
-
-
     # Executes movement logic for the robot to reach final_position.
     # Uses straight-line or RRT-based navigation depending on environment.
     def move_to_target(self, edges_before):
@@ -289,7 +266,7 @@ class PathPlanner:
             if self.has_reached_waypoint(current_position, points[waypoint_index], axis_sign, threshold):
                 waypoint_index += 1
                 if waypoint_index >= len(points):
-                    return self.edges_before, self.error_recta_sum, self.error_recta_count, np.array(self.planned_trajectories), np.array(self.real_trajectory)    # All waypoints reached
+                    return self.edges_before, np.array(self.planned_trajectories), np.array(self.real_trajectory)    # All waypoints reached
 
             # Update LIDAR and try to find a path to the next waypoint. If path is not found, skip to the next waypoint
             self.lidar.get_laser_data()
@@ -304,9 +281,7 @@ class PathPlanner:
             self.edges_before = np.concatenate((self.edges_before, near_edges), axis=0)
 
             if waypoint_index == len(points) or path is None:
-                return self.edges_before, self.error_recta_sum, self.error_recta_count, np.array(self.planned_trajectories), np.array(self.real_trajectory)
-
-            current_path_reference = path.copy()
+                return self.edges_before, np.array(self.planned_trajectories), np.array(self.real_trajectory)
 
             if len(path) == 2:
                 # Straight-line segment (2 nodes)
@@ -321,12 +296,7 @@ class PathPlanner:
                     # Final stop condition if close to goal
                     if self.has_reached_target(axis_sign, threshold):
                         self.robot.move(v=0, w=0)
-                        return self.edges_before, self.error_recta_sum, self.error_recta_count, np.array(self.planned_trajectories), np.array(self.real_trajectory)
-
-                    error = self.point_to_path_distance(current_path_reference)
-
-                    self.error_recta_sum += error
-                    self.error_recta_count += 1
+                        return self.edges_before, np.array(self.planned_trajectories), np.array(self.real_trajectory)
 
                     self.real_trajectory.append(self.get_current_point().copy())
                     self.planned_trajectories.append(path[1].copy())
@@ -345,8 +315,7 @@ class PathPlanner:
                     # Final stop condition if close to goal
                     if self.has_reached_target(axis_sign, threshold):
                         self.robot.move(v=0, w=0)
-                        return self.edges_before, self.error_recta_sum, self.error_recta_count, np.array(self.planned_trajectories), np.array(self.real_trajectory)
-
+                        return self.edges_before, np.array(self.planned_trajectories), np.array(self.real_trajectory)
 
                     self.real_trajectory.append(self.get_current_point().copy())
                     self.planned_trajectories.append(path[j + 1].copy())

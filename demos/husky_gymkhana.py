@@ -15,10 +15,7 @@ from robots.husky import HuskyRobot
 from Movement import PathPlanner
 
 def simulate():
-    total_recta_sum = 0.0
-    total_recta_count = 0
-
-    real_trajectory_all = []  # puntos reales del robot
+    real_trajectory_all = []  # real robot's trajectory points
     planned_trajectories_all = []
 
     # Start simulation
@@ -40,24 +37,24 @@ def simulate():
     # # Define a sequence of movements for the robot to follow
     print('MOVING ROBOT')
     movements = [
-        # {"final_position": (0, -8.5), "movement_axis": 1},
-        {"final_position": (14.5, -9), "movement_axis": 0},                                 # Point 1
-        # {"final_position": (20, 10), "movement_axis": 1},
-        # {"final_position": (15.5, 10.5), "movement_axis": 0},
-        # {"final_position": (15, 20), "movement_axis": 1},
-        # {"final_position": (16.5, 20.5), "movement_axis": 0},                               # Point 2
-        # {"final_position": (17, 22.5), "movement_axis": 1},
-        # {"final_position": (-8, 23), "movement_axis": 0},
-        # {"final_position": (-8.5, 22), "movement_axis": 1},
-        # {"final_position": (-17.5, 21.5), "movement_axis": 0},
-        # {"final_position": (-18, 19), "movement_axis": 1},                                  # Point 3
-        # {"final_position": (-12, 18.5), "movement_axis": 0},
-        # {"final_position": (-11.5, 4.5), "movement_axis": 1},
-        # {"final_position": (-13, 4), "movement_axis": 0},
-        # {"final_position": (-13.5, -9.5), "movement_axis": 1},                              # Point 4
-        # {"final_position": (-12, -10), "movement_axis": 0},
-        # {"final_position": (-11.5, 0), "movement_axis": 1},
-        # {"final_position": (0, 0.5), "movement_axis": 0},                                   # Final point
+        {"final_position": (0, -8.5), "movement_axis": 1},
+        {"final_position": (19.5, -9), "movement_axis": 0},                                 # Point 1
+        {"final_position": (20, 10), "movement_axis": 1},
+        {"final_position": (15.5, 10.5), "movement_axis": 0},
+        {"final_position": (15, 20), "movement_axis": 1},
+        {"final_position": (16.5, 20.5), "movement_axis": 0},                               # Point 2
+        {"final_position": (17, 22.5), "movement_axis": 1},
+        {"final_position": (-8, 23), "movement_axis": 0},
+        {"final_position": (-8.5, 22), "movement_axis": 1},
+        {"final_position": (-17.5, 21.5), "movement_axis": 0},
+        {"final_position": (-18, 19), "movement_axis": 1},                                  # Point 3
+        {"final_position": (-12, 18.5), "movement_axis": 0},
+        {"final_position": (-11.5, 4.5), "movement_axis": 1},
+        {"final_position": (-13, 4), "movement_axis": 0},
+        {"final_position": (-13.5, -9.5), "movement_axis": 1},                              # Point 4
+        {"final_position": (-12, -10), "movement_axis": 0},
+        {"final_position": (-11.5, 0), "movement_axis": 1},
+        {"final_position": (0, 0.5), "movement_axis": 0},                                   # Final point
     ]
 
     edges_before = np.empty((0, 2))
@@ -67,7 +64,7 @@ def simulate():
 
         # Set the previous movement parameters (or default if first movement)
         if i == 0:
-            previous = {"final_position": (2, -9), "movement_axis": current["movement_axis"]}
+            previous = {"final_position": (0, 0), "movement_axis": current["movement_axis"]}
         else:
             previous = movements[i - 1]
 
@@ -91,9 +88,7 @@ def simulate():
     )
 
         # Execute the movement and update edges_before accordingly
-        edges_before, error_recta_sum, error_recta_count, planned_trajectories, real_trajectory = movement_planner.move_to_target(edges_before)
-        total_recta_sum += error_recta_sum
-        total_recta_count += error_recta_count
+        edges_before, planned_trajectories, real_trajectory = movement_planner.move_to_target(edges_before)
         if planned_trajectories is not None and len(planned_trajectories) > 0:
             planned_trajectories_all.append(np.atleast_2d(planned_trajectories))
 
@@ -110,11 +105,11 @@ def simulate():
     plt.figure(figsize=(10, 6))
     print(planned_full)
     print(real_full)
-    # Dibujar caminos planificados (rojo)
+    # Draw planned trajectories (red)
 
-    plt.plot(planned_full[:, 0], planned_full[:, 1], 'r-', linewidth=2, label='Camino planificado')
+    plt.plot(planned_full[:, 0], planned_full[:, 1], 'r-', linewidth=2, label='Planned trajectory')
 
-    plt.plot(real_full[:, 0], real_full[:, 1], 'b-', linewidth=2, label='Camino real')
+    plt.plot(real_full[:, 0], real_full[:, 1], 'b-', linewidth=2, label='Real trajectory')
     plt.xlabel("X [m]")
     plt.ylabel("Y [m]")
     plt.axis("equal")
