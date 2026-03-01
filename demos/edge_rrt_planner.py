@@ -73,8 +73,8 @@ class EdgeDetector:
         # colors = np.full((data.shape[0], 3), 0.5)
         # colors[edge_indices] = [1.0, 0.0, 0.0]         # red
         # colors[collision_indices] = [0.0, 1.0, 0.0]  # green
-        # lidar.choose_colors(colors)
-        # lidar.draw_pointcloud()
+        # self.lidar.choose_colors(colors)
+        # self.lidar.draw_pointcloud()
 
         # Combine both sets of indices
         total_indices = np.concatenate((edge_indices, collision_indices))
@@ -110,7 +110,7 @@ class Node:
 # and provides visualization of the final path and exploration tree.
 class RRT:
     def __init__(self, start_point, goal_point, free_points, obstacle_points, incremental_distance=0.2,
-                 max_iterations=3000, threshold=0.75, goal_threshold=0.2):
+                 max_iterations=500, threshold=0.75, goal_threshold=0.2):
         # Initialize start and goal
         self.start = np.array(start_point, dtype=np.float32)
         self.goal = np.array(goal_point, dtype=np.float32)

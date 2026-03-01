@@ -30,6 +30,10 @@ class PathPlanner:
         self.direction = direction
         self.edges_before =  np.empty((0, 2))
         self.should_draw_path = last
+        self.error_recta_sum = 0.0
+        self.error_recta_count = 0
+        self.real_trajectory = []
+        self.planned_trajectories = []
 
     # Returns the current yaw angle of the robot in degrees.
     def get_angle(self):
@@ -143,10 +147,10 @@ class PathPlanner:
         # all_points = np.concatenate((all_free, all_edges), axis=0)
         # colors_edges = np.tile([1.0, 0.0, 0.0], (all_edges.shape[0], 1))
         # colors_free = np.tile([0.5, 0.5, 0.5], (all_free.shape[0], 1))
-        # lidar.from_points(all_points)
+        # self.lidar.from_points(all_points)
         # colors = np.concatenate((colors_free, colors_edges), axis=0)
-        # lidar.choose_colors(colors)
-        # lidar.draw_pointcloud()
+        # self.lidar.choose_colors(colors)
+        # self.lidar.draw_pointcloud()
 
         # Filter out edges that are above the robot sensor (keep only those below 0.2m)
         all_edges = all_edges[all_edges[:, 2] <= 0.2]
@@ -213,7 +217,7 @@ class PathPlanner:
 
     # Calculates velocity and angular velocity to follow RRT path segment.
     def rrt_movement(self, path, i):
-        current_point = path[i]
+        current_point = self.get_current_point()
         target_point = path[i+1]
         angular_error = self.compute_target_angle_error(current_point, target_point)
 
@@ -222,6 +226,27 @@ class PathPlanner:
         v, w = self.calculate_turning_velocity(angular_error, v)
 
         return v, w
+
+    def point_to_path_distance(self, path):
+        """ Calcula la distancia mínima entre un punto real del robot y una trayectoria planificada (polilínea formada por los nodos del path). point : [x, y] posición real del robot path : Nx2 array de nodos devueltos por edge_rrt_planner """
+
+        point = np.array(self.get_current_point())
+        min_dist = np.inf
+        for i in range(len(path) - 1):
+            a = path[i]
+            b = path[i + 1]
+            ab = b - a
+            ap = point - a  # Proyección del punto sobre el segmento
+            if np.allclose(ab, 0):
+                dist = np.linalg.norm(ap)
+            else:
+                t = np.dot(ap, ab) / np.dot(ab, ab)
+                t = np.clip(t, 0.0, 1.0)
+                closest = a + t * ab
+                dist = np.linalg.norm(point - closest)
+            min_dist = min(min_dist, dist)
+        return min_dist
+
 
     # Executes movement logic for the robot to reach final_position.
     # Uses straight-line or RRT-based navigation depending on environment.
@@ -264,7 +289,7 @@ class PathPlanner:
             if self.has_reached_waypoint(current_position, points[waypoint_index], axis_sign, threshold):
                 waypoint_index += 1
                 if waypoint_index >= len(points):
-                    return self.edges_before    # All waypoints reached
+                    return self.edges_before, self.error_recta_sum, self.error_recta_count, np.array(self.planned_trajectories), np.array(self.real_trajectory)    # All waypoints reached
 
             # Update LIDAR and try to find a path to the next waypoint. If path is not found, skip to the next waypoint
             self.lidar.get_laser_data()
@@ -279,12 +304,15 @@ class PathPlanner:
             self.edges_before = np.concatenate((self.edges_before, near_edges), axis=0)
 
             if waypoint_index == len(points) or path is None:
-                return self.edges_before
+                return self.edges_before, self.error_recta_sum, self.error_recta_count, np.array(self.planned_trajectories), np.array(self.real_trajectory)
+
+            current_path_reference = path.copy()
 
             if len(path) == 2:
                 # Straight-line segment (2 nodes)
-                for j in range(3):           # Repeat up to 3 times (max 0.6m movement)
+                for j in range(3):           # Repeat up to 3 times (max 0.3m movement)
                     current_position = self.get_current_point()
+
                     if self.has_reached_waypoint(current_position, points[waypoint_index], axis_sign, threshold):
                         break
 
@@ -293,7 +321,15 @@ class PathPlanner:
                     # Final stop condition if close to goal
                     if self.has_reached_target(axis_sign, threshold):
                         self.robot.move(v=0, w=0)
-                        return self.edges_before
+                        return self.edges_before, self.error_recta_sum, self.error_recta_count, np.array(self.planned_trajectories), np.array(self.real_trajectory)
+
+                    error = self.point_to_path_distance(current_path_reference)
+
+                    self.error_recta_sum += error
+                    self.error_recta_count += 1
+
+                    self.real_trajectory.append(self.get_current_point().copy())
+                    self.planned_trajectories.append(path[1].copy())
 
                     # Compute velocities and move
                     v, w = self.straight_movement(current_path, points, start_collision)
@@ -302,14 +338,18 @@ class PathPlanner:
 
             elif len(path) > 2:
                 # Complex path generated via RRT
-                for j in range(10):         # Repeat up to 10 times (~0.5m movement)
+                for j in range(10):         # Repeat up to 10 times (~0.25m movement)
                     if j + 1 >= len(path):
                         break
 
                     # Final stop condition if close to goal
                     if self.has_reached_target(axis_sign, threshold):
                         self.robot.move(v=0, w=0)
-                        return self.edges_before
+                        return self.edges_before, self.error_recta_sum, self.error_recta_count, np.array(self.planned_trajectories), np.array(self.real_trajectory)
+
+
+                    self.real_trajectory.append(self.get_current_point().copy())
+                    self.planned_trajectories.append(path[j + 1].copy())
 
                     # Compute velocities and move
                     v, w = self.rrt_movement(path, j)

@@ -1,13 +1,12 @@
-#!/usr/bin/env python
-# encoding: utf-8
-"""
-Please open the scenes/more/husky_robot.ttt scene before running this script.
 
-@Authors: Víctor Márquez, Arturo Gil
-@Time: February 2024
+"""
+Please open the scenes/more/husky_robot_simple_map.ttt scene before running this script.
+
+@Authors: David Mateo
+@Time: July 2025
 # """
 import numpy as np
-
+import matplotlib.pyplot as plt
 from robots.accelerometer import Accelerometer
 from robots.objects import CoppeliaObject
 from robots.ouster import Ouster
@@ -16,6 +15,12 @@ from robots.husky import HuskyRobot
 from Movement import PathPlanner
 
 def simulate():
+    total_recta_sum = 0.0
+    total_recta_count = 0
+
+    real_trajectory_all = []  # puntos reales del robot
+    planned_trajectories_all = []
+
     # Start simulation
     simulation = Simulation()
     simulation.start()
@@ -35,24 +40,24 @@ def simulate():
     # # Define a sequence of movements for the robot to follow
     print('MOVING ROBOT')
     movements = [
-        {"final_position": (0, -8.5), "movement_axis": 1},
-        {"final_position": (19.5, -9), "movement_axis": 0},                                 # Point 1
-        {"final_position": (20, 10), "movement_axis": 1},
-        {"final_position": (15.5, 10.5), "movement_axis": 0},
-        {"final_position": (15, 20), "movement_axis": 1},
-        {"final_position": (16.5, 20.5), "movement_axis": 0},                               # Point 2
-        {"final_position": (17, 22.5), "movement_axis": 1},
-        {"final_position": (-8, 23), "movement_axis": 0},
-        {"final_position": (-8.5, 22), "movement_axis": 1},
-        {"final_position": (-17.5, 21.5), "movement_axis": 0},
-        {"final_position": (-18, 19), "movement_axis": 1},                                  # Point 3
-        {"final_position": (-12, 18.5), "movement_axis": 0},
-        {"final_position": (-11.5, 4.5), "movement_axis": 1},
-        {"final_position": (-13, 4), "movement_axis": 0},
-        {"final_position": (-13.5, -9.5), "movement_axis": 1},                              # Point 4
-        {"final_position": (-12, -10), "movement_axis": 0},
-        {"final_position": (-11.5, 0), "movement_axis": 1},
-        {"final_position": (0, 0.5), "movement_axis": 0},                                   # Final point
+        # {"final_position": (0, -8.5), "movement_axis": 1},
+        {"final_position": (14.5, -9), "movement_axis": 0},                                 # Point 1
+        # {"final_position": (20, 10), "movement_axis": 1},
+        # {"final_position": (15.5, 10.5), "movement_axis": 0},
+        # {"final_position": (15, 20), "movement_axis": 1},
+        # {"final_position": (16.5, 20.5), "movement_axis": 0},                               # Point 2
+        # {"final_position": (17, 22.5), "movement_axis": 1},
+        # {"final_position": (-8, 23), "movement_axis": 0},
+        # {"final_position": (-8.5, 22), "movement_axis": 1},
+        # {"final_position": (-17.5, 21.5), "movement_axis": 0},
+        # {"final_position": (-18, 19), "movement_axis": 1},                                  # Point 3
+        # {"final_position": (-12, 18.5), "movement_axis": 0},
+        # {"final_position": (-11.5, 4.5), "movement_axis": 1},
+        # {"final_position": (-13, 4), "movement_axis": 0},
+        # {"final_position": (-13.5, -9.5), "movement_axis": 1},                              # Point 4
+        # {"final_position": (-12, -10), "movement_axis": 0},
+        # {"final_position": (-11.5, 0), "movement_axis": 1},
+        # {"final_position": (0, 0.5), "movement_axis": 0},                                   # Final point
     ]
 
     edges_before = np.empty((0, 2))
@@ -62,7 +67,7 @@ def simulate():
 
         # Set the previous movement parameters (or default if first movement)
         if i == 0:
-            previous = {"final_position": (0, 0), "movement_axis": current["movement_axis"]}
+            previous = {"final_position": (2, -9), "movement_axis": current["movement_axis"]}
         else:
             previous = movements[i - 1]
 
@@ -86,8 +91,38 @@ def simulate():
     )
 
         # Execute the movement and update edges_before accordingly
-        edges_before = movement_planner.move_to_target(edges_before)
+        edges_before, error_recta_sum, error_recta_count, planned_trajectories, real_trajectory = movement_planner.move_to_target(edges_before)
+        total_recta_sum += error_recta_sum
+        total_recta_count += error_recta_count
+        if planned_trajectories is not None and len(planned_trajectories) > 0:
+            planned_trajectories_all.append(np.atleast_2d(planned_trajectories))
 
+        if real_trajectory is not None and len(real_trajectory) > 0:
+            real_trajectory_all.append(np.atleast_2d(real_trajectory))
+
+    planned_full = [np.array([[2.0, -9.0], [3.0, -9.0]])]
+    planned_full.append(planned_trajectories_all[0])
+    planned_full = np.vstack(planned_full)
+
+    real_full = np.vstack(real_trajectory_all)
+
+
+    plt.figure(figsize=(10, 6))
+    print(planned_full)
+    print(real_full)
+    # Dibujar caminos planificados (rojo)
+
+    plt.plot(planned_full[:, 0], planned_full[:, 1], 'r-', linewidth=2, label='Camino planificado')
+
+    plt.plot(real_full[:, 0], real_full[:, 1], 'b-', linewidth=2, label='Camino real')
+    plt.xlabel("X [m]")
+    plt.ylabel("Y [m]")
+    plt.axis("equal")
+    plt.xlim()
+    plt.ylim()
+    plt.legend(loc='upper right')
+    plt.grid(True)
+    plt.show()
     simulation.stop()
 
 
